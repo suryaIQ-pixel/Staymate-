@@ -6,19 +6,19 @@ import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 const metaEnv = (import.meta as any).env || {};
 
 const firebaseConfig = {
-  apiKey: metaEnv.VITE_FIREBASE_API_KEY || "AIzaSyDUAxyz7J6Imse35MAT5OiTGIhWQc2zCuw",
-  authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || "staymate-e5fba.firebaseapp.com",
-  projectId: metaEnv.VITE_FIREBASE_PROJECT_ID || "staymate-e5fba",
-  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || "staymate-e5fba.firebasestorage.app",
-  messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || "904413450803",
-  appId: metaEnv.VITE_FIREBASE_APP_ID || "1:904413450803:web:aa66acbe93b4e13f628946"
+  apiKey: metaEnv.VITE_FIREBASE_API_KEY || "AIzaSyBfc_V-xw3vLe4Qv--zzSFXPYuTFxGwbNg",
+  authDomain: metaEnv.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0727242047.firebaseapp.com",
+  projectId: metaEnv.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0727242047",
+  storageBucket: metaEnv.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0727242047.firebasestorage.app",
+  messagingSenderId: metaEnv.VITE_FIREBASE_MESSAGING_SENDER_ID || "671497339202",
+  appId: metaEnv.VITE_FIREBASE_APP_ID || "1:671497339202:web:174609b61d2a196ba848db"
 };
 
 // Initialize Firebase App safely (singleton pattern)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = getFirestore(app, metaEnv.VITE_FIREBASE_DATABASE_ID || "ai-studio-132ffea8-d125-4804-9553-cdf2024a8d77");
 
 // Validate Connection to Firestore on initial boot
 export async function testFirebaseConnection() {
