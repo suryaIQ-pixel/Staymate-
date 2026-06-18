@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "Property": {
+      "title": "Property",
+      "description": "An accommodation stay registered by an owner",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique property identify string" },
+        "name": { "type": "string", "description": "Name of the digital stay listing" },
+        "type": { "type": "string", "description": "PG, Hostel, Apartment, Guest House, or Room" },
+        "rating": { "type": "number", "description": "Average user rating" },
+        "reviewsCount": { "type": "number", "description": "All received reviews tally count" },
+        "city": { "type": "string", "description": "City standard location" },
+        "area": { "type": "string", "description": "Locality area" },
+        "price": { "type": "number", "description": "Monthly rent in Indian Rupees" },
+        "sharing": { "type": "string", "description": "Double, Single, Co-living, or Triple" },
+        "ac": { "type": "boolean", "description": "Direct AC accessibility" },
+        "foodIncluded": { "type": "boolean", "description": "Daily meals option included" },
+        "furnished": { "type": "string", "description": "Fully-Furnished, Semi-Furnished, or Unfurnished" },
+        "genderEligibility": { "type": "string", "description": "Co-Living, Boys, or Girls eligibility" },
+        "vacancies": { "type": "number", "description": "Unoccupied single bed count slot" },
+        "ownerId": { "type": "string", "description": "Verified UID of registered owner user" },
+        "ownerName": { "type": "string", "description": "Registered owner human name" },
+        "ownerPhone": { "type": "string", "description": "Owner direct mobile phone contact" },
+        "ownerEmail": { "type": "string", "description": "Owner registered email address" }
+      },
+      "required": ["id", "name", "type", "city", "area", "price", "ownerId", "ownerEmail"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Stay check-in booking ledger request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "propertyName": { "type": "string" },
+        "propertyImage": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "checkInDate": { "type": "string" },
+        "sharingOption": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Canceled"] },
+        "amountPaid": { "type": "number" },
+        "paymentId": { "type": "string" },
+        "invoiceUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "propertyId", "userEmail", "checkInDate", "status", "amountPaid"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "User feedback review detailing experience ratings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "propertyId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userPic": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "date": { "type": "string" },
+        "verified": { "type": "boolean" }
+      },
+      "required": ["id", "propertyId", "userName", "rating", "comment"]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Immutable UPI or Razorpay security deposit transaction verification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "userName": { "type": "string" },
+        "propertyName": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Success", "Failed"] },
+        "paymentMethod": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "bookingId", "amount", "status", "transactionId"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Direct communication records with owners or stay AI assistants",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sender": { "type": "string" },
+        "receiver": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "sender", "receiver", "message", "timestamp"]
+    },
+    "VerificationRequest": {
+      "title": "VerificationRequest",
+      "description": "KYC identification submission for owner credentials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "ownerEmail": { "type": "string" },
+        "documentType": { "type": "string", "enum": ["Aadhaar", "PAN", "GSTIN"] },
+        "documentNumber": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "ownerId", "documentType", "documentNumber", "status"]
+    }
+  },
+  "firestore": {
+    "/properties/{propertyId}": {
+      "schema": { "$ref": "Property" },
+      "description": "Registered co-living and hostel properties list"
+    },
+    "/bookings/{bookingId}": {
+      "schema": { "$ref": "Booking" },
+      "description": "Reservation ledger requests"
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "Review" },
+      "description": "Accommodations feedback ratings and critiques"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "PaymentRecord" },
+      "description": "Immutable payment transactions"
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "ChatMessage" },
+      "description": "Interactive messaging dialogues between users or AI"
+    },
+    "/kycRequests/{requestId}": {
+      "schema": { "$ref": "VerificationRequest" },
+      "description": "User Aadhaar/KYC identity documents verification records"
+    }
+  }
+}

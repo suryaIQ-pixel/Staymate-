@@ -9,6 +9,81 @@ import {
 } from 'lucide-react';
 import { User, UserRole } from '../types';
 
+// Strictly check if name is valid (letters and spaces only, 3+ chars, no consecutive spaces, no dummy repetitions like asdf or aaaa)
+const isValidName = (name: string): boolean => {
+  const trimmed = name.trim();
+  if (trimmed.length < 3) return false;
+  
+  // Characters from A-Z, a-z and spaces only
+  if (!/^[a-zA-Z\s]{3,40}$/.test(trimmed)) return false;
+  
+  // Check for consecutive spaces
+  if (/\s{2,}/.test(trimmed)) return false;
+
+  // Block four identical characters repeating anywhere (e.g. "aaaa", "zzzz")
+  if (/(.)\1\1\1/.test(trimmed.toLowerCase())) return false;
+
+  // Block dummy phrases
+  const lowered = trimmed.toLowerCase();
+  const dummyNames = ["abc", "xyz", "asdf", "test", "qwerty", "random", "none", "unknown", "name", "user", "dummy", "guest"];
+  if (dummyNames.some(dummy => lowered.includes(dummy) || lowered === dummy)) return false;
+
+  return true;
+};
+
+// Strictly validate email addresses (RFC format check, valid standard ending, block popular random domain strings)
+const isValidEmail = (email: string): boolean => {
+  const trimmed = email.trim();
+  // Standard strict regex
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/;
+  if (!emailRegex.test(trimmed)) return false;
+
+  // Block popular dummy domains
+  const dummyDomains = ["test.com", "example.com", "abc.com", "xyz.com", "dummy.com", "qwerty.com", "asdf.com", "temp.com", "mailinator.com"];
+  const parts = trimmed.toLowerCase().split('@');
+  if (parts.length !== 2) return false;
+  
+  const [username, domain] = parts;
+  if (dummyDomains.includes(domain)) return false;
+
+  // Domain TLD check (must have at least one period, end with valid string length)
+  const domainParts = domain.split('.');
+  if (domainParts.length < 2 || domainParts.some(p => p.length < 2)) return false;
+
+  // Username must not be too short or a standard dummy word
+  if (username.length < 3 || ["abc", "xyz", "asdf", "test", "qwerty", "dummy"].includes(username)) return false;
+
+  return true;
+};
+
+// Strictly validate Indian / International mobile numbers (10 digits minimum, starts with 6-9, no fake or identical repeating sequences)
+const isValidPhone = (phone: string): boolean => {
+  // Strip spaces, dashes, parentheses and plus signs
+  const cleaned = phone.replace(/[\s\-()+]/g, '');
+  if (cleaned.length < 10) return false;
+  
+  // Extract trailing 10 digits (most standard phone numbers)
+  const trailing10 = cleaned.slice(-10);
+  if (!/^\d{10}$/.test(trailing10)) return false;
+
+  // Indian mobile numbers must start with 6, 7, 8, or 9
+  if (!/^[6-9]/.test(trailing10)) return false;
+
+  // Block identical repeating digits like 9999999999
+  if (/^(\d)\1{9}$/.test(trailing10)) return false;
+
+  // Block sequential numbers like 1234567890 or 9876543210
+  const sequentialPatterns = [
+    "1234567890",
+    "9876543210",
+    "0123456789",
+    "0987654321"
+  ];
+  if (sequentialPatterns.includes(trailing10)) return false;
+
+  return true;
+};
+
 interface LoginModalProps {
   onClose: () => void;
   onLoginSuccess: (user: User) => void;
@@ -55,17 +130,21 @@ export default function LoginModal({ onClose, onLoginSuccess, currentUser }: Log
     setErrorMsg('');
 
     if (isSignUp) {
-      // Interactive Signup flow logic
-      if (!signupName.trim()) {
-        setErrorMsg('Please enter your full name.');
+      // Interactive Signup flow logic with STRICT VALIDATION
+      if (!isValidName(signupName)) {
+        setErrorMsg('Authentication Canceled: Invalid Name. Please enter a genuine Full Name (letters and spaces only, at least 3 characters). Keyboard-smash or dummy inputs are not accepted.');
         return;
       }
-      if (!signupEmail.trim() || !signupEmail.includes('@')) {
-        setErrorMsg('Please enter a valid email address.');
+      if (!isValidEmail(signupEmail)) {
+        setErrorMsg('Authentication Canceled: Invalid Email. Please enter a valid, standard email address. Keyboard-smash strings, temporary emails, and fake test domains are blocked.');
         return;
       }
-      if (!signupPhone.trim()) {
-        setErrorMsg('Please enter your contact phone number.');
+      if (!isValidPhone(signupPhone)) {
+        setErrorMsg('Authentication Canceled: Invalid Phone Number. Please enter a real 10-digit mobile number. Fictional, sequential (e.g. 1234567890), or repeating numbers are strictly forbidden.');
+        return;
+      }
+      if (signupPassword.length < 6) {
+        setErrorMsg('Authentication Canceled: Password must be at least 6 characters long.');
         return;
       }
 
@@ -74,9 +153,9 @@ export default function LoginModal({ onClose, onLoginSuccess, currentUser }: Log
         // Build a dynamic registered user account state
         const registeredUser: User = {
           id: `user-${Math.floor(Math.random() * 1000050)}`,
-          name: signupName,
-          email: signupEmail,
-          phone: activeTab === 'tenant' ? `******${signupPhone.slice(-4)}` : signupPhone, // Mask phone for tenants
+          name: signupName.trim(),
+          email: signupEmail.trim().toLowerCase(),
+          phone: activeTab === 'tenant' ? `******${signupPhone.trim().slice(-4)}` : signupPhone.trim(), // Mask phone for tenants
           role: activeTab,
           verifiedKYC: activeTab === 'owner', // Preset owner to true for demonstration convenience
           walletBalance: 0 // New users start with 0 balance
@@ -86,7 +165,12 @@ export default function LoginModal({ onClose, onLoginSuccess, currentUser }: Log
       }, 1500);
 
     } else {
-      // Existing Sign-in flow logic
+      // Existing Sign-in flow logic with STRICT VALIDATION
+      if (!isValidEmail(email)) {
+        setErrorMsg('Authentication Canceled: Invalid Email. Please enter a genuine, properly formatted email address to log in.');
+        return;
+      }
+
       if (activeTab === 'admin') {
         // Admin Authentication Check
         if (email === 'suryakant11th@gmail.com' && password === 'ravikant9934') {
@@ -105,7 +189,7 @@ export default function LoginModal({ onClose, onLoginSuccess, currentUser }: Log
             onClose();
           }, 1200);
         } else {
-          setErrorMsg('Incorrect Admin Email or Password. Please try again with authorized credentials.');
+          setErrorMsg('Authentication Canceled: Incorrect Admin Email or Password. Only authorized administrators with pre-registered credentials can sign in.');
         }
       } else if (activeTab === 'owner') {
         // Owner Quick Login
@@ -113,8 +197,8 @@ export default function LoginModal({ onClose, onLoginSuccess, currentUser }: Log
         setTimeout(() => {
           const ownerUser: User = {
             id: 'user-anil',
-            name: 'Anil Kumar',
-            email: 'anil.staymate@gmail.com',
+            name: email === 'anil.staymate@gmail.com' ? 'Anil Kumar' : email.split('@')[0].toUpperCase().replace(/[^A-Z]/g, ' '),
+            email: email.trim().toLowerCase(),
             phone: '+91 98765 43210',
             role: 'owner',
             verifiedKYC: true,
@@ -129,8 +213,8 @@ export default function LoginModal({ onClose, onLoginSuccess, currentUser }: Log
         setTimeout(() => {
           const tenantUser: User = {
             id: 'user-suryakant',
-            name: 'Suryakant Sharma',
-            email: 'suryakant11th@gmail.com',
+            name: email === 'suryakant11th@gmail.com' ? 'Suryakant Sharma' : email.split('@')[0].toUpperCase().replace(/[^A-Z]/g, ' '),
+            email: email.trim().toLowerCase(),
             phone: '******6355', // Masked phone number as requested to prevent direct call exposure
             role: 'tenant',
             verifiedKYC: false,

@@ -11,6 +11,8 @@ import {
 
 import { Property, Booking, User, PaymentRecord, VerificationRequest, Review } from './types';
 import { INITIAL_PROPERTIES, INITIAL_REVIEWS } from './mockData';
+import { addFirestoreProperty, addFirestoreReview, addFirestoreKYCRequest, ensureFirebaseAuth } from './firebaseSync';
+
 
 // Component Imports
 import Navbar from './components/Navbar';
@@ -65,6 +67,7 @@ export default function App() {
   // Initial synchronization with full-stack endpoints
   useEffect(() => {
     syncAppWithBackend();
+    ensureFirebaseAuth();
   }, []);
 
   const syncAppWithBackend = async () => {
@@ -123,6 +126,13 @@ export default function App() {
         body: JSON.stringify(newProp)
       });
       if (res.ok) {
+        const addedProp: Property = await res.json();
+        // Sync with Firebase
+        try {
+          await addFirestoreProperty(addedProp);
+        } catch (fbPropErr) {
+          console.warn("Firestore Property sync warning:", fbPropErr);
+        }
         await syncAppWithBackend();
       }
     } catch (e) {
@@ -135,6 +145,12 @@ export default function App() {
         reviewsCount: 1
       };
       setProperties(prev => [mockNew, ...prev]);
+      // Sync fallback to Firebase
+      try {
+        await addFirestoreProperty(mockNew);
+      } catch (fbPropErr) {
+        console.warn("Firestore Property fallback sync warning:", fbPropErr);
+      }
     }
   };
 
@@ -162,37 +178,64 @@ export default function App() {
     };
 
     try {
-      await fetch('/api/reviews', {
+      const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRev)
       });
+      if (res.ok) {
+        const addedReview: Review = await res.json();
+        try {
+          await addFirestoreReview(addedReview.id, addedReview);
+        } catch (fbRevErr) {
+          console.warn("Firestore Review sync issue:", fbRevErr);
+        }
+      }
       await syncAppWithBackend();
     } catch (e) {
       console.error(e);
       // local push fallback
+      const reviewId = `rev-add-${Date.now()}`;
       const seededRev: Review = {
         ...newRev,
-        id: `rev-add-${Date.now()}`
+        id: reviewId
       };
       setReviews(prev => [seededRev, ...prev]);
+      try {
+        await addFirestoreReview(reviewId, seededRev);
+      } catch (fbRevErr2) {
+        console.warn("Firestore Review fallback sync issue:", fbRevErr2);
+      }
     }
   };
 
   // Handle KYC Document Completion
   const handleKYCVerification = async (aadhaarNum: string) => {
+    const kycObj = {
+      ownerId: currentUser.id,
+      ownerName: currentUser.name,
+      ownerEmail: currentUser.email,
+      documentType: 'Aadhaar',
+      documentNumber: aadhaarNum,
+      status: 'Pending',
+      timestamp: new Date().toISOString()
+    };
+
     try {
-      await fetch('/api/kyc', {
+      const res = await fetch('/api/kyc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ownerId: currentUser.id,
-          ownerName: currentUser.name,
-          ownerEmail: currentUser.email,
-          documentType: 'Aadhaar Card',
-          documentNumber: aadhaarNum
-        })
+        body: JSON.stringify(kycObj)
       });
+
+      if (res.ok) {
+        const addedKyc: VerificationRequest = await res.json();
+        try {
+          await addFirestoreKYCRequest(addedKyc.id, addedKyc);
+        } catch (fbKycErr) {
+          console.warn("Firestore KYC sync warning:", fbKycErr);
+        }
+      }
 
       // Update local state is immediate
       setCurrentUser(prev => ({ ...prev, verifiedKYC: true }));
@@ -200,6 +243,12 @@ export default function App() {
     } catch (e) {
       console.error(e);
       setCurrentUser(prev => ({ ...prev, verifiedKYC: true }));
+      const fallbackKycId = `kyc-add-${Date.now()}`;
+      try {
+        await addFirestoreKYCRequest(fallbackKycId, { ...kycObj, id: fallbackKycId });
+      } catch (fbKycErr2) {
+        console.warn("Firestore KYC fallback sync issue:", fbKycErr2);
+      }
     }
   };
 

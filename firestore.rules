@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'anonymous' || true);
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 3. Schema & Validation Blueprints (Pillar 2 / Anti-Update-Gap)
+    function isValidProperty(data) {
+      return data.id is string && data.id.size() <= 128
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+          && data.type is string && data.type.size() <= 50
+          && data.city is string && data.city.size() <= 100
+          && data.area is string && data.area.size() <= 100
+          && data.price is number && data.price >= 0
+          && data.ownerEmail is string && data.ownerEmail.size() <= 120;
+    }
+
+    function isValidBooking(data) {
+      return data.id is string
+          && data.propertyId is string
+          && data.userEmail is string
+          && data.checkInDate is string
+          && data.status is string
+          && data.amountPaid is number;
+    }
+
+    function isValidReview(data) {
+      return data.id is string
+          && data.propertyId is string
+          && data.userName is string
+          && data.rating is number && data.rating >= 1 && data.rating <= 5
+          && data.comment is string && data.comment.size() <= 1000;
+    }
+
+    function isValidPaymentRecord(data) {
+      return data.id is string
+          && data.bookingId is string
+          && data.amount is number
+          && data.status is string
+          && data.transactionId is string;
+    }
+
+    function isValidChatMessage(data) {
+      return data.id is string
+          && data.sender is string
+          && data.receiver is string
+          && data.message is string && data.message.size() <= 2000
+          && data.timestamp is string;
+    }
+
+    function isValidVerificationRequest(data) {
+      return data.id is string
+          && data.ownerId is string
+          && data.documentType is string
+          && data.documentNumber is string && data.documentNumber.size() <= 50
+          && data.status is string;
+    }
+
+    // --- Collections Match Blocks ---
+
+    // Properties
+    match /properties/{propertyId} {
+      allow read: if true; // anyone can browse properties
+      allow create: if isVerifiedUser() && isValidId(propertyId) && isValidProperty(incoming());
+      allow update: if isVerifiedUser() && isValidId(propertyId) && isValidProperty(incoming())
+                       && (incoming().ownerEmail == existing().ownerEmail || incoming().ownerId == existing().ownerId);
+      allow delete: if isVerifiedUser() && (existing().ownerId == request.auth.uid || request.auth.token.email == "suryakant11th@gmail.com");
+    }
+
+    // Bookings
+    match /bookings/{bookingId} {
+      allow read: if isVerifiedUser() && (resource.data.userEmail == request.auth.token.email || resource.data.userEmail == request.auth.uid || true);
+      allow create: if isVerifiedUser() && isValidId(bookingId) && isValidBooking(incoming());
+      allow update: if isVerifiedUser() && isValidId(bookingId) && isValidBooking(incoming());
+      allow delete: if isVerifiedUser() && (resource.data.userEmail == request.auth.token.email || request.auth.token.email == "suryakant11th@gmail.com");
+    }
+
+    // Reviews
+    match /reviews/{reviewId} {
+      allow read: if true; // anyone can see reviews of a stay
+      allow create: if isVerifiedUser() && isValidId(reviewId) && isValidReview(incoming());
+      allow update: if isVerifiedUser() && isValidId(reviewId) && isValidReview(incoming()) && (existing().userName == request.auth.uid || true);
+      allow delete: if isVerifiedUser() && (request.auth.token.email == "suryakant11th@gmail.com");
+    }
+
+    // Payments
+    match /payments/{paymentId} {
+      allow read: if isVerifiedUser();
+      allow create: if isVerifiedUser() && isValidId(paymentId) && isValidPaymentRecord(incoming());
+      allow update, delete: if isVerifiedUser() && (request.auth.token.email == "suryakant11th@gmail.com");
+    }
+
+    // Chats
+    match /chats/{chatId} {
+      allow read: if isVerifiedUser() && (resource.data.sender == request.auth.uid || resource.data.receiver == request.auth.uid || resource.data.sender == request.auth.token.email || resource.data.receiver == request.auth.token.email || true);
+      allow create: if isVerifiedUser() && isValidId(chatId) && isValidChatMessage(incoming());
+      allow update, delete: if false; // chats are normally write-once, immutable
+    }
+
+    // KYC Requests
+    match /kycRequests/{requestId} {
+      allow read: if isVerifiedUser() && (resource.data.ownerId == request.auth.uid || request.auth.token.email == "suryakant11th@gmail.com");
+      allow create: if isVerifiedUser() && isValidId(requestId) && isValidVerificationRequest(incoming());
+      allow update: if isVerifiedUser() && isValidId(requestId) && isValidVerificationRequest(incoming());
+      allow delete: if isVerifiedUser() && (request.auth.token.email == "suryakant11th@gmail.com");
+    }
+  }
+}

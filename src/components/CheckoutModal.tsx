@@ -6,6 +6,8 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, CreditCard, Landmark, QrCode, FileText, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 import { Property, Booking, SharingType } from '../types';
+import { addFirestoreBooking, addFirestorePayment } from '../firebaseSync';
+
 
 interface CheckoutModalProps {
   property: Property;
@@ -120,19 +122,37 @@ export default function CheckoutModal({ property, onClose, onPaymentSuccess }: C
       const bookingData: Booking = await bookingRes.json();
       setGeneratedBookingId(bookingData.id);
 
+      // Async sync to user's Firebase account
+      try {
+        await addFirestoreBooking(bookingData);
+      } catch (fbErr) {
+        console.warn("Firestore Booking Sync issue:", fbErr);
+      }
+
+      const paymentObj = {
+        bookingId: bookingData.id,
+        userName: 'Suryakant Sharma',
+        propertyName: property.name,
+        amount: depositPrice(),
+        paymentMethod: methodUsed.toUpperCase(),
+        transactionId: tId,
+        timestamp: new Date().toISOString()
+      };
+
       // 2. Submit Payment Link
       await fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookingId: bookingData.id,
-          userName: 'Suryakant Sharma',
-          propertyName: property.name,
-          amount: depositPrice(),
-          paymentMethod: methodUsed.toUpperCase(),
-          transactionId: tId
-        })
+        body: JSON.stringify(paymentObj)
       });
+
+      // Async sync payment to user's Firebase account
+      try {
+        await addFirestorePayment(tId, paymentObj);
+      } catch (fbPayErr) {
+        console.warn("Firestore Payment Sync issue:", fbPayErr);
+      }
+
 
       setGeneratedTxnId(tId);
       setPaymentState('success');

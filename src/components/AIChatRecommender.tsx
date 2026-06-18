@@ -6,6 +6,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, MessageSquare, X, Send, Loader2, ArrowRight, Home, IndianRupee, Compass } from 'lucide-react';
 import { ChatMessage, Property } from '../types';
+import { addFirestoreChatMessage } from '../firebaseSync';
+
 
 interface AIChatRecommenderProps {
   currentUserEmail: string;
@@ -59,6 +61,13 @@ export default function AIChatRecommender({ currentUserEmail, onSelectProperty, 
     setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
 
+    // Sync user message to Firebase
+    try {
+      await addFirestoreChatMessage(userMsg.id, userMsg);
+    } catch (fbChatErr) {
+      console.warn("Firestore Chat sync warning:", fbChatErr);
+    }
+
     try {
       const response = await fetch('/api/chats', {
         method: 'POST',
@@ -79,18 +88,33 @@ export default function AIChatRecommender({ currentUserEmail, onSelectProperty, 
         // Match only dialogs where user is involved
         if (logData.length > 0) {
           setMessages(logData);
+          // Sync any new messages (e.g. AI answer) to Firestore
+          const newestMsg = logData[logData.length - 1];
+          if (newestMsg && newestMsg.sender === 'AI') {
+            try {
+              await addFirestoreChatMessage(newestMsg.id || `chat-ai-${Date.now()}`, newestMsg);
+            } catch (fbChatErr2) {
+              console.warn("Firestore Chat reply sync warning:", fbChatErr2);
+            }
+          }
         }
       }
     } catch (err) {
       console.error('Error fetching chat session response:', err);
       // Fallback
-      setMessages(prev => [...prev, {
+      const fallMsg: ChatMessage = {
         id: `chat-fall-${Date.now()}`,
         sender: 'AI',
         receiver: currentUserEmail,
         message: `Hi there! I faced a temporary connection blip. However, noting your interest in "${finalMsg}", I highly recommend sorting by budget or city in our main menu!`,
         timestamp: new Date().toISOString()
-      }]);
+      };
+      setMessages(prev => [...prev, fallMsg]);
+      try {
+        await addFirestoreChatMessage(fallMsg.id, fallMsg);
+      } catch (fbChatErr3) {
+        console.warn("Firestore Chat reply fallback sync warning:", fbChatErr3);
+      }
     } finally {
       setIsTyping(false);
     }
