@@ -140,6 +140,11 @@ function getGeminiClient(): GoogleGenAI | null {
 
 // API Routes
 
+// Google Search Console dynamic verification route
+app.get('/google4a2a5da9ea95ad01.html', (req, res) => {
+  res.type('html').send('google-site-verification: google4a2a5da9ea95ad01.html');
+});
+
 // 1. Properties
 app.get('/api/properties', (req, res) => {
   res.json(dbStore.properties);
